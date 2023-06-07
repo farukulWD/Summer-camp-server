@@ -25,6 +25,23 @@ async function run() {
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
 
+    const usersCollection = client
+      .db("sportFitDB")
+      .collection("usersCollection");
+
+    // user post
+    app.post("/users", async (req, res) => {
+      const user = req.body;
+      const query = { email: user.email };
+      console.log(user);
+      const existingUser = await usersCollection.findOne(query);
+      if (existingUser) {
+        return res.send({ message: "user already exist" });
+      }
+      const result = await usersCollection.insertOne(user);
+      res.send(result);
+    });
+
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log(
