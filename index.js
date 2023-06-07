@@ -28,12 +28,15 @@ async function run() {
     const usersCollection = client
       .db("sportFitDB")
       .collection("usersCollection");
+    const selectedClasses = client
+      .db("sportFitDB")
+      .collection("selectedClasses");
 
     // user post
     app.post("/users", async (req, res) => {
       const user = req.body;
       const query = { email: user.email };
-      console.log(user);
+
       const existingUser = await usersCollection.findOne(query);
       if (existingUser) {
         return res.send({ message: "user already exist" });
@@ -41,9 +44,17 @@ async function run() {
       const result = await usersCollection.insertOne(user);
       res.send(result);
     });
-
+    // user get
     app.get("/users", async (req, res) => {
       const result = await usersCollection.find({}).toArray();
+      res.send(result);
+    });
+
+    // Selected Class post
+    app.post("/selected", async (req, res) => {
+      const selectedClass = req.body;
+      console.log(selectedClass);
+      const result = await selectedClasses.insertOne(selectedClass);
       res.send(result);
     });
 
