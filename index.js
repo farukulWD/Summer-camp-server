@@ -32,6 +32,12 @@ async function run() {
     const selectedClasses = client
       .db("sportFitDB")
       .collection("selectedClasses");
+    const paymentCollection = client
+      .db("sportFitDB")
+      .collection("paymentsClasses");
+    const allClassesCollection = client
+      .db("sportFitDB")
+      .collection("allClasses");
 
     // user post
     app.post("/users", async (req, res) => {
@@ -81,6 +87,7 @@ async function run() {
       const { price } = req.body;
 
       const amount = parseInt(price * 100);
+      console.log(price);
       const paymentIntent = await stripe.paymentIntents.create({
         amount: amount,
         currency: "usd",
@@ -89,6 +96,27 @@ async function run() {
       res.send({
         clientSecret: paymentIntent.client_secret,
       });
+    });
+
+    // Post payments classes
+    app.post("/payments", async (req, res) => {
+      const payment = req.body;
+      const id = payment.id;
+
+      const insertResult = await paymentCollection.insertOne(payment);
+
+      const query = { _id: new ObjectId(id) };
+
+      const deleteResult = await selectedClasses.deleteOne(query);
+
+      res.send({ insertResult });
+    });
+
+    // get all class
+    app.get("/allClass", async (req, res) => {
+      const query = {};
+      const result = await allClassesCollection.find(query).toArray();
+      res.send(result);
     });
 
     // Send a ping to confirm a successful connection
