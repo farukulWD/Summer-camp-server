@@ -69,7 +69,9 @@ async function run() {
     app.get("/selectedClass", async (req, res) => {
       const email = req.query.email;
       const query = { studentEmail: email };
+      console.log(email);
       const result = await selectedClasses.find(query).toArray();
+
       res.send(result);
     });
 
@@ -116,6 +118,27 @@ async function run() {
     app.get("/allClass", async (req, res) => {
       const query = {};
       const result = await allClassesCollection.find(query).toArray();
+      res.send(result);
+    });
+    // get payments classes
+    app.get("/myenrolled", async (req, res) => {
+      const userEmail = req.query.email;
+      console.log(userEmail);
+      const query = { email: userEmail };
+      console.log(query);
+      const result = await paymentCollection.find(query).toArray();
+      res.send(result);
+    });
+    // for payment history
+    app.get("/myPaymentHistory", async (req, res) => {
+      const userEmail = req.query.email;
+      console.log(userEmail);
+      const query = { email: userEmail };
+      console.log(query);
+      const result = await paymentCollection
+        .find(query)
+        .sort({ date: -1 })
+        .toArray();
       res.send(result);
     });
 
