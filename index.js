@@ -13,6 +13,27 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+const verifyJWT = (req, res, next) => {
+  const authorization = req.headers.authorization;
+  if (!authorization) {
+    return res
+      .status(401)
+      .send({ error: true, message: "unauthorized access" });
+  }
+
+  const token = authorization.split(" ")[1];
+
+  jwt.verify(token, process.env.token_secret, (err, decoded) => {
+    if (err) {
+      return res
+        .status(401)
+        .send({ error: true, message: "unauthorized access" });
+    }
+    req.decoded = decoded;
+    next();
+  });
+};
+
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_USER_PASS}@cluster0.0w2mrif.mongodb.net/?retryWrites=true&w=majority`;
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
@@ -43,6 +64,14 @@ async function run() {
       .db("sportFitDB")
       .collection("allInstructor");
 
+    app.post("/jwt", (req, res) => {
+      const user = req.body;
+      const token = jwt.sign(user, process.env.token_secret, {
+        expiresIn: "1h",
+      });
+      res.send({ token });
+    });
+
     // user post
     app.post("/users", async (req, res) => {
       const user = req.body;
@@ -56,14 +85,14 @@ async function run() {
       res.send(result);
     });
     // user get
-    app.get("/users", async (req, res) => {
+    app.get("/users", verifyJWT, async (req, res) => {
       const result = await usersCollection.find({}).toArray();
       res.send(result);
     });
 
     // make admin api
 
-    app.patch("/users/admin/:id", async (req, res) => {
+    app.patch("/users/admin/:id", verifyJWT, async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
       const updateDoc = {
@@ -76,7 +105,7 @@ async function run() {
     });
 
     // make instructor api
-    app.patch("/users/instructor/:id", async (req, res) => {
+    app.patch("/users/instructor/:id", verifyJWT, async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
 
@@ -88,9 +117,31 @@ async function run() {
       const result = await usersCollection.updateOne(filter, updateDoc);
       res.send(result);
     });
+    // add instructor
+    app.post("/adInstructor", async (req, res) => {
+      const insData = req.body;
+      const email = req.query.email;
+      const query = { email: email };
+      const existingIns = await allInstructorCollection.findOne(query);
+      if (existingIns) {
+        return res.send("Instructor is already existing");
+      }
+
+      const result = await allInstructorCollection.insertOne(insData);
+      res.send(result);
+    });
+    // get instructor
+    app.get("/allInstructor", async (req, res) => {
+      const query = {};
+      const result = await allInstructorCollection
+        .find(query)
+        .sort({ number_of_students: -1 })
+        .toArray();
+      res.send(result);
+    });
 
     // get admin api
-    app.get("/user/admin/:email", async (req, res) => {
+    app.get("/user/admin/:email", verifyJWT, async (req, res) => {
       const email = req.params.email;
       const query = { email: email };
       const user = await usersCollection.findOne(query);
@@ -99,7 +150,7 @@ async function run() {
     });
 
     // get instructor api
-    app.get("/user/instructor/:email", async (req, res) => {
+    app.get("/user/instructor/:email", verifyJWT, async (req, res) => {
       const email = req.params.email;
       const query = { email: email };
 
@@ -109,7 +160,7 @@ async function run() {
     });
 
     // add classes
-    app.post("/addclasses", async (req, res) => {
+    app.post("/addclasses", verifyJWT, async (req, res) => {
       const adClass = req.body;
 
       const result = await allClassesCollection.insertOne(adClass);
@@ -117,22 +168,49 @@ async function run() {
     });
 
     // get my class
-    app.get("/myclass", async (req, res) => {
+    app.get("/myclass", verifyJWT, async (req, res) => {
       const email = req.query.email;
       const query = { instructor_email: email };
       const result = await allClassesCollection.find(query).toArray();
       res.send(result);
     });
 
+    // update class
+    app.patch("/update/class/:id", verifyJWT, async (req, res) => {
+      const updateItems = req.body;
+
+      const { class_name, picture, available_seats, price } = updateItems;
+      const id = req.params.id;
+
+      const option = { upsert: true };
+      const filter = { _id: new ObjectId(id) };
+
+      const updatedDoc = {
+        $set: {
+          class_name: class_name,
+          picture: picture,
+          available_seats: available_seats,
+          price: price,
+        },
+      };
+
+      const result = await allClassesCollection.updateOne(
+        filter,
+        updatedDoc,
+        option
+      );
+      res.send(result);
+    });
+
     // delete my classes
-    app.delete("/myclass/:id", async (req, res) => {
+    app.delete("/myclass/:id", verifyJWT, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await allClassesCollection.deleteOne(query);
       res.send(result);
     });
     // get one my class
-    app.get("/myclass/:id", async (req, res) => {
+    app.get("/myclass/:id", verifyJWT, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await allClassesCollection.findOne(query);
@@ -147,7 +225,7 @@ async function run() {
     });
 
     // selected class get
-    app.get("/selectedClass", async (req, res) => {
+    app.get("/selectedClass", verifyJWT, async (req, res) => {
       const email = req.query.email;
       const query = { studentEmail: email };
 
@@ -157,7 +235,7 @@ async function run() {
     });
 
     // selected class delete
-    app.delete("/selectedDelete/:id", async (req, res) => {
+    app.delete("/selectedDelete/:id", verifyJWT, async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await selectedClasses.deleteOne(query);
@@ -166,7 +244,7 @@ async function run() {
 
     // paymentIntent
 
-    app.post("/createIntent", async (req, res) => {
+    app.post("/createIntent", verifyJWT, async (req, res) => {
       const { price } = req.body;
 
       const amount = parseInt(price * 100);
@@ -182,7 +260,7 @@ async function run() {
     });
 
     // Post payments classes
-    app.post("/payments", async (req, res) => {
+    app.post("/payments", verifyJWT, async (req, res) => {
       const payment = req.body;
       const id = payment.id;
       const classId = req.query.classId;
@@ -200,7 +278,7 @@ async function run() {
       };
       const updateNumberOfStudent = {
         $inc: {
-          number_of_students: 1,
+          number_of_classes: 1,
         },
       };
       const result = await allClassesCollection.updateOne(filter, updateDoc);
@@ -225,13 +303,13 @@ async function run() {
       res.send(result);
     });
     // all classes
-    app.get("/allClass", async (req, res) => {
+    app.get("/allClass", verifyJWT, async (req, res) => {
       const query = {};
       const result = await allClassesCollection.find(query).toArray();
       res.send(result);
     });
     // make approved api
-    app.patch("/allClass/approved/:id", async (req, res) => {
+    app.patch("/allClass/approved/:id", verifyJWT, async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
       const updateDoc = {
@@ -243,7 +321,7 @@ async function run() {
       res.send(result);
     });
     // make denied api
-    app.patch("/allClass/denied/:id", async (req, res) => {
+    app.patch("/allClass/denied/:id", verifyJWT, async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
       const updateDoc = {
@@ -256,7 +334,7 @@ async function run() {
     });
 
     //  feedback api
-    app.patch("/allClass/feedback/:id", async (req, res) => {
+    app.patch("/allClass/feedback/:id", verifyJWT, async (req, res) => {
       const id = req.params.id;
       const feedback = req.query.feedback;
       const filter = { _id: new ObjectId(id) };
@@ -271,7 +349,7 @@ async function run() {
     });
 
     // get payments classes
-    app.get("/myenrolled", async (req, res) => {
+    app.get("/myenrolled", verifyJWT, async (req, res) => {
       const userEmail = req.query.email;
 
       const query = { email: userEmail };
@@ -280,7 +358,7 @@ async function run() {
       res.send(result);
     });
     // for payment history
-    app.get("/myPaymentHistory", async (req, res) => {
+    app.get("/myPaymentHistory", verifyJWT, async (req, res) => {
       const userEmail = req.query.email;
       const query = { email: userEmail };
       const result = await paymentCollection
