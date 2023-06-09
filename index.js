@@ -204,6 +204,19 @@ async function run() {
       const result = await allClassesCollection.find(query).toArray();
       res.send(result);
     });
+
+    app.patch("/allClass/approved/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set: {
+          status: "approved",
+        },
+      };
+      const result = await allClassesCollection.updateOne(filter, updateDoc);
+      res.send(result);
+    });
+
     // get payments classes
     app.get("/myenrolled", async (req, res) => {
       const userEmail = req.query.email;
