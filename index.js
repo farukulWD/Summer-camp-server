@@ -73,6 +73,29 @@ async function run() {
       res.send(result);
     });
 
+    // get my class
+    app.get("/myclass", async (req, res) => {
+      const email = req.query.email;
+      const query = { instructor_email: email };
+      const result = await allClassesCollection.find(query).toArray();
+      res.send(result);
+    });
+
+    // delete my classes
+    app.delete("/myclass/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await allClassesCollection.deleteOne(query);
+      res.send(result);
+    });
+    // get one my class
+    app.get("/myclass/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await allClassesCollection.findOne(query);
+      res.send(result);
+    });
+
     // selected class get
     app.get("/selectedClass", async (req, res) => {
       const email = req.query.email;
