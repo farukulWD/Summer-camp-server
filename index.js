@@ -199,18 +199,31 @@ async function run() {
         .toArray();
       res.send(result);
     });
+    // all classes
     app.get("/allClass", async (req, res) => {
       const query = {};
       const result = await allClassesCollection.find(query).toArray();
       res.send(result);
     });
-
+    // make approved api
     app.patch("/allClass/approved/:id", async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
       const updateDoc = {
         $set: {
           status: "approved",
+        },
+      };
+      const result = await allClassesCollection.updateOne(filter, updateDoc);
+      res.send(result);
+    });
+    // make denied api
+    app.patch("/allClass/denied/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set: {
+          status: "denied",
         },
       };
       const result = await allClassesCollection.updateOne(filter, updateDoc);
