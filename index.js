@@ -57,6 +57,8 @@ async function run() {
       res.send(result);
     });
 
+    // make admin api
+
     app.patch("/users/admin/:id", async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
@@ -65,7 +67,19 @@ async function run() {
           role: "admin",
         },
       };
+      const result = await usersCollection.updateOne(filter, updateDoc);
+      res.send(result);
+    });
 
+    // make instructor api
+    app.patch("/users/instructor/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set: {
+          role: "instructor",
+        },
+      };
       const result = await usersCollection.updateOne(filter, updateDoc);
       res.send(result);
     });
@@ -176,7 +190,15 @@ async function run() {
       res.send({ insertResult });
     });
 
-    // get all class
+    // get all approved class
+    app.get("/allApprovedClass", async (req, res) => {
+      const query = { status: { $nin: ["pending", "denied"] } };
+      const result = await allClassesCollection
+        .find(query)
+        .sort({ totalEnrolled: -1 })
+        .toArray();
+      res.send(result);
+    });
     app.get("/allClass", async (req, res) => {
       const query = {};
       const result = await allClassesCollection.find(query).toArray();
