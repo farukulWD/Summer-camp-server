@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const port = process.env.PORT || 5000;
 require("dotenv").config();
+const jwt = require("jsonwebtoken");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const stripe = require("stripe")(process.env.Payment_secret_key);
 
@@ -38,6 +39,9 @@ async function run() {
     const allClassesCollection = client
       .db("sportFitDB")
       .collection("allClasses");
+    const allInstructorCollection = client
+      .db("sportFitDB")
+      .collection("allInstructor");
 
     // user post
     app.post("/users", async (req, res) => {
@@ -75,6 +79,7 @@ async function run() {
     app.patch("/users/instructor/:id", async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
+
       const updateDoc = {
         $set: {
           role: "instructor",
@@ -97,6 +102,7 @@ async function run() {
     app.get("/user/instructor/:email", async (req, res) => {
       const email = req.params.email;
       const query = { email: email };
+
       const user = await usersCollection.findOne(query);
       const result = { instructor: user?.role === "instructor" };
       res.send(result);
@@ -105,16 +111,8 @@ async function run() {
     // add classes
     app.post("/addclasses", async (req, res) => {
       const adClass = req.body;
-      console.log(adClass);
-      const result = await allClassesCollection.insertOne(adClass);
-      res.send(result);
-    });
 
-    // Selected Class post
-    app.post("/selected", async (req, res) => {
-      const selectedClass = req.body;
-      console.log(selectedClass);
-      const result = await selectedClasses.insertOne(selectedClass);
+      const result = await allClassesCollection.insertOne(adClass);
       res.send(result);
     });
 
@@ -141,11 +139,18 @@ async function run() {
       res.send(result);
     });
 
+    // Selected Class post
+    app.post("/selected", async (req, res) => {
+      const selectedClass = req.body;
+      const result = await selectedClasses.insertOne(selectedClass);
+      res.send(result);
+    });
+
     // selected class get
     app.get("/selectedClass", async (req, res) => {
       const email = req.query.email;
       const query = { studentEmail: email };
-      console.log(email);
+
       const result = await selectedClasses.find(query).toArray();
 
       res.send(result);
@@ -165,7 +170,7 @@ async function run() {
       const { price } = req.body;
 
       const amount = parseInt(price * 100);
-      console.log(price);
+
       const paymentIntent = await stripe.paymentIntents.create({
         amount: amount,
         currency: "usd",
@@ -180,14 +185,34 @@ async function run() {
     app.post("/payments", async (req, res) => {
       const payment = req.body;
       const id = payment.id;
-
-      const insertResult = await paymentCollection.insertOne(payment);
-
+      const classId = req.query.classId;
       const query = { _id: new ObjectId(id) };
+      const instructorEmail = payment.instructor_email;
+
+      const filter = { _id: new ObjectId(classId) };
+      const filterInstructor = { email: instructorEmail };
+
+      const updateDoc = {
+        $inc: {
+          totalEnrolled: 1,
+          available_seats: -1,
+        },
+      };
+      const updateNumberOfStudent = {
+        $inc: {
+          number_of_students: 1,
+        },
+      };
+      const result = await allClassesCollection.updateOne(filter, updateDoc);
+      const updateStudentNumber = await allInstructorCollection.updateOne(
+        filterInstructor,
+        updateNumberOfStudent
+      );
+      const insertResult = await paymentCollection.insertOne(payment);
 
       const deleteResult = await selectedClasses.deleteOne(query);
 
-      res.send({ insertResult });
+      res.send({ insertResult, deleteResult, result, updateStudentNumber });
     });
 
     // get all approved class
@@ -230,21 +255,34 @@ async function run() {
       res.send(result);
     });
 
+    //  feedback api
+    app.patch("/allClass/feedback/:id", async (req, res) => {
+      const id = req.params.id;
+      const feedback = req.query.feedback;
+      const filter = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set: {
+          feedback: feedback,
+        },
+      };
+
+      const result = await allClassesCollection.updateOne(filter, updateDoc);
+      res.send(result);
+    });
+
     // get payments classes
     app.get("/myenrolled", async (req, res) => {
       const userEmail = req.query.email;
-      console.log(userEmail);
+
       const query = { email: userEmail };
-      console.log(query);
+
       const result = await paymentCollection.find(query).toArray();
       res.send(result);
     });
     // for payment history
     app.get("/myPaymentHistory", async (req, res) => {
       const userEmail = req.query.email;
-      console.log(userEmail);
       const query = { email: userEmail };
-      console.log(query);
       const result = await paymentCollection
         .find(query)
         .sort({ date: -1 })
