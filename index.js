@@ -72,6 +72,25 @@ async function run() {
       res.send({ token });
     });
 
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.decoded.email;
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      if (user?.role !== "admin") {
+        return res.status(403).send({ error: true, message: "forbidden" });
+      }
+      next();
+    };
+    const verifyInstructor = async (req, res, next) => {
+      const email = req.decoded.email;
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      if (user?.role !== "instructor") {
+        return res.status(403).send({ error: true, message: "forbidden" });
+      }
+      next();
+    };
+
     // user post
     app.post("/users", async (req, res) => {
       const user = req.body;
@@ -92,7 +111,7 @@ async function run() {
 
     // make admin api
 
-    app.patch("/users/admin/:id", verifyJWT, async (req, res) => {
+    app.patch("/users/admin/:id", verifyJWT, verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const filter = { _id: new ObjectId(id) };
       const updateDoc = {
@@ -105,20 +124,25 @@ async function run() {
     });
 
     // make instructor api
-    app.patch("/users/instructor/:id", verifyJWT, async (req, res) => {
-      const id = req.params.id;
-      const filter = { _id: new ObjectId(id) };
+    app.patch(
+      "/users/instructor/:id",
+      verifyJWT,
+      verifyAdmin,
+      async (req, res) => {
+        const id = req.params.id;
+        const filter = { _id: new ObjectId(id) };
 
-      const updateDoc = {
-        $set: {
-          role: "instructor",
-        },
-      };
-      const result = await usersCollection.updateOne(filter, updateDoc);
-      res.send(result);
-    });
+        const updateDoc = {
+          $set: {
+            role: "instructor",
+          },
+        };
+        const result = await usersCollection.updateOne(filter, updateDoc);
+        res.send(result);
+      }
+    );
     // add instructor
-    app.post("/adInstructor", async (req, res) => {
+    app.post("/adInstructor", verifyJWT, async (req, res) => {
       const insData = req.body;
       const email = req.query.email;
       const query = { email: email };
@@ -131,7 +155,7 @@ async function run() {
       res.send(result);
     });
     // get instructor
-    app.get("/allInstructor", async (req, res) => {
+    app.get("/allInstructor", verifyJWT, async (req, res) => {
       const query = {};
       const result = await allInstructorCollection
         .find(query)
@@ -160,7 +184,7 @@ async function run() {
     });
 
     // add classes
-    app.post("/addclasses", verifyJWT, async (req, res) => {
+    app.post("/addclasses", verifyJWT, verifyInstructor, async (req, res) => {
       const adClass = req.body;
 
       const result = await allClassesCollection.insertOne(adClass);
@@ -168,7 +192,7 @@ async function run() {
     });
 
     // get my class
-    app.get("/myclass", verifyJWT, async (req, res) => {
+    app.get("/myclass", verifyJWT, verifyInstructor, async (req, res) => {
       const email = req.query.email;
       const query = { instructor_email: email };
       const result = await allClassesCollection.find(query).toArray();
@@ -176,31 +200,36 @@ async function run() {
     });
 
     // update class
-    app.patch("/update/class/:id", verifyJWT, async (req, res) => {
-      const updateItems = req.body;
+    app.patch(
+      "/update/class/:id",
+      verifyJWT,
+      verifyInstructor,
+      async (req, res) => {
+        const updateItems = req.body;
 
-      const { class_name, picture, available_seats, price } = updateItems;
-      const id = req.params.id;
+        const { class_name, picture, available_seats, price } = updateItems;
+        const id = req.params.id;
 
-      const option = { upsert: true };
-      const filter = { _id: new ObjectId(id) };
+        const option = { upsert: true };
+        const filter = { _id: new ObjectId(id) };
 
-      const updatedDoc = {
-        $set: {
-          class_name: class_name,
-          picture: picture,
-          available_seats: available_seats,
-          price: price,
-        },
-      };
+        const updatedDoc = {
+          $set: {
+            class_name: class_name,
+            picture: picture,
+            available_seats: available_seats,
+            price: price,
+          },
+        };
 
-      const result = await allClassesCollection.updateOne(
-        filter,
-        updatedDoc,
-        option
-      );
-      res.send(result);
-    });
+        const result = await allClassesCollection.updateOne(
+          filter,
+          updatedDoc,
+          option
+        );
+        res.send(result);
+      }
+    );
 
     // delete my classes
     app.delete("/myclass/:id", verifyJWT, async (req, res) => {
@@ -278,7 +307,7 @@ async function run() {
       };
       const updateNumberOfStudent = {
         $inc: {
-          number_of_classes: 1,
+          number_of_students: 1,
         },
       };
       const result = await allClassesCollection.updateOne(filter, updateDoc);
@@ -303,7 +332,7 @@ async function run() {
       res.send(result);
     });
     // all classes
-    app.get("/allClass", verifyJWT, async (req, res) => {
+    app.get("/allClass", verifyJWT, verifyAdmin, async (req, res) => {
       const query = {};
       const result = await allClassesCollection.find(query).toArray();
       res.send(result);
