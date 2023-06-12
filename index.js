@@ -46,7 +46,7 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    // await client.connect();
 
     const usersCollection = client
       .db("sportFitDB")
@@ -155,7 +155,7 @@ async function run() {
       res.send(result);
     });
     // get instructor
-    app.get("/allInstructor", verifyJWT, async (req, res) => {
+    app.get("/allInstructor", async (req, res) => {
       const query = {};
       const result = await allInstructorCollection
         .find(query)
@@ -247,7 +247,7 @@ async function run() {
     });
 
     // Selected Class post
-    app.post("/selected", async (req, res) => {
+    app.post("/selected", verifyJWT, async (req, res) => {
       const selectedClass = req.body;
       const result = await selectedClasses.insertOne(selectedClass);
       res.send(result);
